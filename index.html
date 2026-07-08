@@ -218,7 +218,7 @@ footer .cc{font-family:var(--mono); font-size:12px}
 </div></section>
 
 <footer><div class="wrap">
-  <div>Built as a public reference. Every implementation is <b>verified</b> against the same worked example &mdash; 100 calls / 30&nbsp;min, 180&nbsp;s AHT, 80%&nbsp;in&nbsp;20s &rarr; <b>14 agents</b> &mdash; and agrees to floating-point precision.</div>
+  <div>Built as a public reference. The live calculator and the runnable reference implementations are <b>checked</b> against the same worked example &mdash; 100 calls / 30&nbsp;min, 180&nbsp;s AHT, 80%&nbsp;in&nbsp;20s &rarr; <b>14 agents</b>. Every port implements the identical, verified algorithm.</div>
   <div>Agner Krarup <b>Erlang</b> derived this at the Copenhagen Telephone Company in 1917 to size manual switchboards. It still staffs every contact centre with a queue.</div>
   <div class="cc">No rights reserved &mdash; CC0 / public domain. Take it, port it, ship it.</div>
 </div></footer>
@@ -570,7 +570,7 @@ module ErlangC
 
   def self.service_level(agents, traffic, aht, target)
     return 0.0 if agents <= traffic
-    1 - wait(agents, traffic) * Math.exp(-(agents - traffic) * target / aht)
+    1 - wait(agents, traffic) * Math.exp(-(agents - traffic) * target / aht.to_f)
   end
 
   def self.asa(agents, traffic, aht)          # average speed of answer (s)
