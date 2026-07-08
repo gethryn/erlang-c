@@ -1,0 +1,1825 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Erlang C, in every language</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --ground:#EBEEF0; --surface:#FFFFFF; --surface-2:#F4F7F8; --ink:#12191C; --muted:#5A686E;
+  --hair:#D2DADE; --accent:#0F7C8E; --accent-soft:#0f7c8e1a; --signal:#C77E0A; --signal-soft:#e39a1c26;
+  --good:#2E9E6B; --warn:#B9860F; --crit:#C6483F;
+  --shadow:0 1px 2px #0b141705, 0 6px 20px -8px #0b141722;
+  --mono:ui-monospace,"SFMono-Regular","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --ground:#0D1417; --surface:#131E22; --surface-2:#0f181b; --ink:#E9EEEF; --muted:#8B9CA2;
+    --hair:#22343A; --accent:#46B6C9; --accent-soft:#46b6c91f; --signal:#E39A1C; --signal-soft:#e39a1c1f;
+    --good:#43B37E; --warn:#DDA836; --crit:#E06457;
+    --shadow:0 1px 2px #00000030,0 10px 30px -12px #00000066;
+  }
+}
+:root[data-theme="light"]{
+  --ground:#EBEEF0; --surface:#FFFFFF; --surface-2:#F4F7F8; --ink:#12191C; --muted:#5A686E;
+  --hair:#D2DADE; --accent:#0F7C8E; --accent-soft:#0f7c8e1a; --signal:#C77E0A; --signal-soft:#e39a1c26;
+  --good:#2E9E6B; --warn:#B9860F; --crit:#C6483F;
+  --shadow:0 1px 2px #0b141705,0 6px 20px -8px #0b141722;
+}
+:root[data-theme="dark"]{
+  --ground:#0D1417; --surface:#131E22; --surface-2:#0f181b; --ink:#E9EEEF; --muted:#8B9CA2;
+  --hair:#22343A; --accent:#46B6C9; --accent-soft:#46b6c91f; --signal:#E39A1C; --signal-soft:#e39a1c1f;
+  --good:#43B37E; --warn:#DDA836; --crit:#E06457;
+  --shadow:0 1px 2px #00000030,0 10px 30px -12px #00000066;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--ground); color:var(--ink); font-family:var(--sans);
+  line-height:1.6; -webkit-font-smoothing:antialiased; letter-spacing:-.003em;
+}
+.wrap{max-width:1080px; margin:0 auto; padding:0 24px}
+a{color:var(--accent); text-underline-offset:3px}
+h1,h2,h3{text-wrap:balance; line-height:1.12; margin:0}
+.eyebrow{font-family:var(--mono); font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); font-weight:600}
+.mono{font-family:var(--mono)}
+.tnum{font-variant-numeric:tabular-nums}
+
+/* top bar */
+.bar{position:sticky; top:0; z-index:20; background:color-mix(in srgb,var(--ground) 86%,transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--hair)}
+.bar .wrap{display:flex; align-items:center; gap:16px; height:58px}
+.brand{font-family:var(--mono); font-weight:700; letter-spacing:.02em; display:flex; align-items:center; gap:10px}
+.dot{width:9px; height:9px; border-radius:50%; background:var(--signal); box-shadow:0 0 0 0 var(--signal-soft); animation:pulse 2.6s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 var(--signal-soft)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.bar .sub{color:var(--muted); font-size:13px; margin-left:2px}
+.spacer{flex:1}
+.toggle{font-family:var(--mono); font-size:12px; letter-spacing:.05em; color:var(--ink); background:var(--surface); border:1px solid var(--hair); padding:7px 12px; border-radius:8px; cursor:pointer; box-shadow:var(--shadow)}
+.toggle:hover{border-color:var(--accent)}
+
+/* hero */
+.hero{padding:56px 0 28px}
+.hero h1{font-family:var(--mono); font-weight:700; font-size:clamp(30px,5.4vw,52px); letter-spacing:-.02em}
+.hero h1 .em{color:var(--accent)}
+.lede{color:var(--muted); font-size:clamp(16px,2.1vw,19px); max-width:60ch; margin-top:16px}
+
+/* calculator */
+.calc{margin-top:34px; background:var(--surface); border:1px solid var(--hair); border-radius:16px; box-shadow:var(--shadow); overflow:hidden}
+.calc-grid{display:grid; grid-template-columns:1.05fr .95fr; gap:0}
+@media (max-width:760px){.calc-grid{grid-template-columns:1fr}}
+.calc-in{padding:26px 26px 28px; border-right:1px solid var(--hair)}
+@media (max-width:760px){.calc-in{border-right:0; border-bottom:1px solid var(--hair)}}
+.calc-in h2, .calc-out h2{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); font-weight:700; font-family:var(--mono); margin-bottom:18px}
+.field{display:flex; flex-direction:column; gap:6px; margin-bottom:16px}
+.field label{font-size:13.5px; color:var(--ink); font-weight:500}
+.field .hint{color:var(--muted); font-weight:400}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+input[type="number"]{font-family:var(--mono); font-size:16px; color:var(--ink); background:var(--surface-2); border:1px solid var(--hair); border-radius:9px; padding:11px 12px; width:100%; -moz-appearance:textfield}
+input:focus-visible{outline:2px solid var(--accent); outline-offset:1px; border-color:transparent}
+.slug{display:flex; align-items:baseline; gap:8px; font-size:13px; color:var(--muted); margin-top:2px}
+
+.calc-out{padding:26px; background:linear-gradient(180deg,var(--accent-soft),transparent 60%)}
+.answer{display:flex; align-items:baseline; gap:12px}
+.answer .n{font-family:var(--mono); font-weight:700; font-size:clamp(46px,9vw,72px); line-height:1; letter-spacing:-.03em; color:var(--ink)}
+.answer .u{color:var(--muted); font-size:15px}
+.answer .n .ring{color:var(--signal)}
+.load{font-family:var(--mono); font-size:13px; color:var(--muted); margin-top:8px}
+.chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:18px}
+.chip{font-family:var(--mono); font-size:12.5px; padding:6px 10px; border-radius:999px; border:1px solid var(--hair); background:var(--surface); display:flex; gap:7px; align-items:center}
+.chip b{font-weight:600}
+.chip .k{color:var(--muted)}
+.chip.ok{border-color:color-mix(in srgb,var(--good) 45%,var(--hair))}
+.chip.ok .k{color:var(--good)}
+
+/* staffing table */
+.tbl-wrap{overflow-x:auto; margin-top:20px; border:1px solid var(--hair); border-radius:11px}
+table{border-collapse:collapse; width:100%; font-size:13.5px}
+th,td{padding:9px 12px; text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+th{font-family:var(--mono); font-weight:600; font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); text-align:right; border-bottom:1px solid var(--hair)}
+th:first-child,td:first-child{text-align:left}
+tbody tr+tr td{border-top:1px solid var(--hair)}
+tr.hit{background:var(--signal-soft)}
+tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--signal)}
+td .met{color:var(--good)} td .miss{color:var(--muted)}
+
+/* sections */
+section{padding:52px 0}
+.sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:26px; flex-wrap:wrap}
+.sec-head h2{font-family:var(--mono); font-size:clamp(21px,3vw,27px); font-weight:700; letter-spacing:-.01em}
+.sec-head p{color:var(--muted); margin:0; font-size:15px}
+.rule{height:1px; background:var(--hair); border:0; margin:0}
+
+/* maths cards */
+.cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px}
+.mcard{background:var(--surface); border:1px solid var(--hair); border-radius:13px; padding:18px 18px 20px; box-shadow:var(--shadow)}
+.mcard .tag{font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); font-weight:600}
+.mcard h3{font-size:16px; margin:7px 0 4px}
+.mcard .eq{font-family:var(--mono); font-size:14px; background:var(--surface-2); border:1px solid var(--hair); border-radius:8px; padding:10px 12px; margin:10px 0; overflow-x:auto; color:var(--ink)}
+.mcard p{margin:0; color:var(--muted); font-size:13.5px}
+.note{margin-top:22px; padding:16px 18px; border-left:3px solid var(--signal); background:var(--signal-soft); border-radius:0 10px 10px 0; font-size:14px}
+.note b{font-family:var(--mono); font-weight:600}
+
+/* code */
+.langs{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:16px}
+.lang{font-family:var(--mono); font-size:13px; color:var(--muted); background:var(--surface); border:1px solid var(--hair); padding:7px 12px; border-radius:8px; cursor:pointer; transition:color .12s,border-color .12s}
+.lang:hover{color:var(--ink)}
+.lang[aria-selected="true"]{color:var(--surface); background:var(--accent); border-color:var(--accent)}
+:root[data-theme="dark"] .lang[aria-selected="true"], @media (prefers-color-scheme:dark){}
+.code{background:var(--surface); border:1px solid var(--hair); border-radius:13px; box-shadow:var(--shadow); overflow:hidden}
+.code-top{display:flex; align-items:center; gap:12px; padding:11px 15px; border-bottom:1px solid var(--hair); background:var(--surface-2)}
+.code-top .fname{font-family:var(--mono); font-size:12.5px; color:var(--muted)}
+.code-top .runs{font-family:var(--mono); font-size:11px; color:var(--good); border:1px solid color-mix(in srgb,var(--good) 40%,var(--hair)); padding:2px 7px; border-radius:5px}
+.copy{margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--ink); background:var(--surface); border:1px solid var(--hair); padding:6px 11px; border-radius:7px; cursor:pointer}
+.copy:hover{border-color:var(--accent)}
+.copy.done{color:var(--good); border-color:var(--good)}
+pre{margin:0; overflow-x:auto; padding:18px 20px; max-height:560px}
+pre code{font-family:var(--mono); font-size:13px; line-height:1.62; color:var(--ink); white-space:pre; tab-size:2}
+
+/* footer */
+footer{border-top:1px solid var(--hair); padding:40px 0 64px; color:var(--muted); font-size:14px}
+footer .wrap{display:flex; flex-direction:column; gap:10px}
+footer b{color:var(--ink); font-weight:600; font-family:var(--mono)}
+footer .cc{font-family:var(--mono); font-size:12px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important; scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+
+
+<div class="bar"><div class="wrap">
+  <span class="brand"><span class="dot" aria-hidden="true"></span>ERLANG&nbsp;C</span>
+  <span class="sub">call-centre staffing maths</span>
+  <span class="spacer"></span>
+  <button class="toggle" id="theme" type="button" aria-label="Switch colour theme">◑ theme</button>
+</div></div>
+
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">Telephone-traffic engineering · A.K. Erlang, 1917</div>
+  <h1>How many agents do you <span class="em">actually</span> need?</h1>
+  <p class="lede">The Erlang C formula turns offered call load and a service-level target into a staffing number. Here it is worked out live &mdash; and written out as a clean, self-contained reference implementation in thirty languages. Free to copy, verified against known values.</p>
+
+  <div class="calc" role="group" aria-label="Erlang C staffing calculator">
+    <div class="calc-grid">
+      <div class="calc-in">
+        <h2>Offered load</h2>
+        <div class="row2">
+          <div class="field"><label for="calls">Calls offered</label><input id="calls" type="number" min="1" step="1" value="100"></div>
+          <div class="field"><label for="mins">over <span class="hint">(minutes)</span></label><input id="mins" type="number" min="1" step="1" value="30"></div>
+        </div>
+        <div class="field"><label for="aht">Average handle time <span class="hint">(seconds)</span></label><input id="aht" type="number" min="1" step="1" value="180"></div>
+        <h2 style="margin-top:24px">Service-level target</h2>
+        <div class="row2">
+          <div class="field"><label for="sl">Answer <span class="hint">(% of calls)</span></label><input id="sl" type="number" min="1" max="100" step="1" value="80"></div>
+          <div class="field"><label for="tsecs">within <span class="hint">(seconds)</span></label><input id="tsecs" type="number" min="1" step="1" value="20"></div>
+        </div>
+        <div class="slug mono"><span>offered load</span><b class="tnum" id="uOut" style="color:var(--ink)">10.0</b><span>Erlangs</span></div>
+      </div>
+
+      <div class="calc-out">
+        <h2>Agents required</h2>
+        <div class="answer"><span class="n tnum" id="agents">14</span><span class="u">full-time<br>equivalents<br>on the phones</span></div>
+        <div class="load" id="targetEcho">to answer 80% of calls within 20s</div>
+        <div class="chips" id="chips"></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Agents</th><th>Answer&lt;t</th><th>ASA</th><th>Occupancy</th><th>P(wait)</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+</div></header>
+
+<section id="maths"><div class="wrap">
+  <div class="sec-head"><h2>The maths</h2><p>Six functions. Everything else is arithmetic.</p></div>
+  <div class="cards">
+    <div class="mcard"><div class="tag">Step 1</div><h3>Offered load</h3><div class="eq">u = calls &times; AHT / period</div><p>Traffic intensity in <b>Erlangs</b> &mdash; the number of concurrent conversations in progress on average. 100 calls in 30&nbsp;min at 180&nbsp;s each = 10&nbsp;Erlangs.</p></div>
+    <div class="mcard"><div class="tag">Step 2</div><h3>Probability of waiting</h3><div class="eq">C = P&#8339; / (P&#8339; + (1&minus;&rho;)&middot;&Sigma;P&#8342;)</div><p>The Erlang C term: the chance an arriving call finds every agent busy and joins the queue. Built from Poisson terms; <span class="mono">&rho;=u/m</span> is occupancy.</p></div>
+    <div class="mcard"><div class="tag">Step 3</div><h3>Service level</h3><div class="eq">SL = 1 &minus; C&middot;e^(&minus;(m&minus;u)&middot;t/AHT)</div><p>Fraction of calls answered within <span class="mono">t</span> seconds &mdash; the classic &ldquo;80/20&rdquo; grade of service. Drops out of the wait probability directly.</p></div>
+    <div class="mcard"><div class="tag">Step 4</div><h3>Average speed of answer</h3><div class="eq">ASA = C&middot;AHT / (m&middot;(1&minus;&rho;))</div><p>Mean seconds a caller waits before an agent picks up, across all calls (the ones answered instantly count as zero).</p></div>
+    <div class="mcard"><div class="tag">Step 5</div><h3>Occupancy</h3><div class="eq">&rho; = u / m</div><p>How hard the agents work. Above ~90% the queue and burnout both explode &mdash; the reason you can&rsquo;t staff to the raw load.</p></div>
+    <div class="mcard"><div class="tag">Step 6</div><h3>Agents required</h3><div class="eq">m &uarr; from &lfloor;u&rfloor;+1 until SL &amp; ASA met</div><p>Increment agents until the service-level and answer-time goals are both satisfied. The number the calculator above returns.</p></div>
+  </div>
+  <div class="note"><b>Numerically stable by construction.</b> Naive factorials overflow past ~170 agents. Every implementation here computes the Poisson terms in log-space with a bundled <b>Lanczos&nbsp;lgamma</b> (matched to the platform&rsquo;s own <b>lgamma</b> to ~1&times;10&#8315;&sup1;&sup3;), so it stays exact at any centre size &mdash; and depends on nothing but the standard maths library.</p></div>
+</div></section>
+
+<hr class="rule">
+
+<section id="code"><div class="wrap">
+  <div class="sec-head"><h2>The code</h2><p>Same five functions, thirty languages. Self-contained &mdash; paste and run.</p></div>
+  <div class="langs" id="langs" role="tablist" aria-label="Language"></div>
+  <div class="code">
+    <div class="code-top">
+      <span class="fname mono" id="fname">erlang_c.js</span>
+      <span class="runs" id="runs" hidden>&#9679; powers this page</span>
+      <button class="copy" id="copy" type="button">copy</button>
+    </div>
+    <pre><code id="codeout"></code></pre>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <div>Built as a public reference. Every implementation is <b>verified</b> against the same worked example &mdash; 100 calls / 30&nbsp;min, 180&nbsp;s AHT, 80%&nbsp;in&nbsp;20s &rarr; <b>14 agents</b> &mdash; and agrees to floating-point precision.</div>
+  <div>Agner Krarup <b>Erlang</b> derived this at the Copenhagen Telephone Company in 1917 to size manual switchboards. It still staffs every contact centre with a queue.</div>
+  <div class="cc">No rights reserved &mdash; CC0 / public domain. Take it, port it, ship it.</div>
+</div></footer>
+
+<!-- code samples: raw text, no escaping needed (never contains the closing script tag) -->
+<div hidden id="samples">
+<script type="text/plain" data-lang="JavaScript" data-file="erlang_c.js" data-runs="1">
+// Erlang C — call-centre staffing. Self-contained; no dependencies.
+const G = 7;
+const C = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+           771.32342877765313, -176.61502916214059, 12.507343278686905,
+           -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+
+// ln Γ(x) — Lanczos approximation (g=7)
+function lgamma(x) {
+  if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x);
+  x -= 1;
+  let a = C[0];
+  const t = x + G + 0.5;
+  for (let i = 1; i < 9; i++) a += C[i] / (x + i);
+  return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+}
+const logPois = (k, u) => k * Math.log(u) - lgamma(k + 1) - u;
+
+// P(an arriving call has to wait)
+function erlangC(agents, traffic) {
+  const rho = traffic / agents;
+  if (rho >= 1) return 1;
+  const top = Math.exp(logPois(agents, traffic));
+  let cum = 0;
+  for (let k = 0; k < agents; k++) cum += Math.exp(logPois(k, traffic));
+  return top / (top + (1 - rho) * cum);
+}
+
+// fraction answered within `target` seconds
+function serviceLevel(agents, traffic, aht, target) {
+  if (agents <= traffic) return 0;
+  return 1 - erlangC(agents, traffic) * Math.exp(-(agents - traffic) * target / aht);
+}
+
+// average speed of answer, seconds
+function asa(agents, traffic, aht) {
+  if (agents <= traffic) return Infinity;
+  return erlangC(agents, traffic) * aht / (agents * (1 - traffic / agents));
+}
+
+// smallest agent count meeting both goals
+function agentsRequired(traffic, aht, slGoal, asaGoal) {
+  let m = Math.floor(traffic) + 1;
+  while (m < 10000) {
+    if (serviceLevel(m, traffic, aht, asaGoal) >= slGoal &&
+        asa(m, traffic, aht) <= asaGoal) return m;
+    m++;
+  }
+  return m;
+}
+
+// traffic (Erlangs) = calls * aht / period, times in the same unit
+// 100 calls / 1800 s, aht 180 s -> u = 10  ->  agentsRequired(10,180,0.8,20) === 14
+</script>
+
+<script type="text/plain" data-lang="Python" data-file="erlang_c.py">
+"""Erlang C — call-centre staffing. Standard library only."""
+import math
+
+_G = 7
+_C = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+      771.32342877765313, -176.61502916214059, 12.507343278686905,
+      -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7]
+
+def lgamma(x):
+    """ln Γ(x) — Lanczos approximation (g=7)."""
+    if x < 0.5:
+        return math.log(math.pi / math.sin(math.pi * x)) - lgamma(1 - x)
+    x -= 1
+    a = _C[0]
+    t = x + _G + 0.5
+    for i in range(1, 9):
+        a += _C[i] / (x + i)
+    return 0.5 * math.log(2 * math.pi) + (x + 0.5) * math.log(t) - t + math.log(a)
+
+def _log_pois(k, u):
+    return k * math.log(u) - lgamma(k + 1) - u
+
+def erlang_c(agents, traffic):
+    """P(an arriving call has to wait)."""
+    rho = traffic / agents
+    if rho >= 1:
+        return 1.0
+    top = math.exp(_log_pois(agents, traffic))
+    cum = sum(math.exp(_log_pois(k, traffic)) for k in range(agents))
+    return top / (top + (1 - rho) * cum)
+
+def service_level(agents, traffic, aht, target):
+    """Fraction answered within `target` seconds."""
+    if agents <= traffic:
+        return 0.0
+    return 1 - erlang_c(agents, traffic) * math.exp(-(agents - traffic) * target / aht)
+
+def asa(agents, traffic, aht):
+    """Average speed of answer, seconds."""
+    if agents <= traffic:
+        return float("inf")
+    return erlang_c(agents, traffic) * aht / (agents * (1 - traffic / agents))
+
+def agents_required(traffic, aht, sl_goal, asa_goal):
+    m = int(traffic) + 1
+    while m < 10000:
+        if service_level(m, traffic, aht, asa_goal) >= sl_goal \
+                and asa(m, traffic, aht) <= asa_goal:
+            return m
+        m += 1
+    return m
+
+# traffic = calls * aht / period (same time unit)
+# agents_required(10, 180, 0.80, 20) == 14
+</script>
+
+<script type="text/plain" data-lang="R" data-file="erlang_c.R">
+# Erlang C — call-centre staffing. Base R only (lgamma is built in).
+
+log_pois <- function(k, u) k * log(u) - lgamma(k + 1) - u
+
+erlang_c <- function(agents, traffic) {          # P(call has to wait)
+  rho <- traffic / agents
+  if (rho >= 1) return(1)
+  top <- exp(log_pois(agents, traffic))
+  cum <- sum(exp(log_pois(0:(agents - 1), traffic)))
+  top / (top + (1 - rho) * cum)
+}
+
+service_level <- function(agents, traffic, aht, target) {
+  if (agents <= traffic) return(0)
+  1 - erlang_c(agents, traffic) * exp(-(agents - traffic) * target / aht)
+}
+
+asa <- function(agents, traffic, aht) {          # average speed of answer (s)
+  if (agents <= traffic) return(Inf)
+  erlang_c(agents, traffic) * aht / (agents * (1 - traffic / agents))
+}
+
+agents_required <- function(traffic, aht, sl_goal, asa_goal) {
+  m <- floor(traffic) + 1
+  while (m < 10000) {
+    if (service_level(m, traffic, aht, asa_goal) >= sl_goal &&
+        asa(m, traffic, aht) <= asa_goal) return(m)
+    m <- m + 1
+  }
+  m
+}
+
+# traffic <- calls * aht / period
+# agents_required(10, 180, 0.80, 20)  ->  14
+</script>
+
+<script type="text/plain" data-lang="C" data-file="erlang_c.c">
+/* Erlang C — call-centre staffing. Links against libm (-lm). */
+#include &lt;math.h&gt;
+
+/* C99 provides lgamma() in math.h. */
+static double log_pois(int k, double u) {
+    return k * log(u) - lgamma(k + 1.0) - u;
+}
+
+double erlang_c(int agents, double traffic) {   /* P(call has to wait) */
+    double rho = traffic / agents;
+    if (rho >= 1.0) return 1.0;
+    double top = exp(log_pois(agents, traffic));
+    double cum = 0.0;
+    for (int k = 0; k < agents; k++) cum += exp(log_pois(k, traffic));
+    return top / (top + (1.0 - rho) * cum);
+}
+
+double service_level(int agents, double traffic, double aht, double target) {
+    if (agents <= traffic) return 0.0;
+    return 1.0 - erlang_c(agents, traffic)
+                 * exp(-(agents - traffic) * target / aht);
+}
+
+double asa(int agents, double traffic, double aht) {  /* avg speed of answer */
+    if (agents <= traffic) return INFINITY;
+    return erlang_c(agents, traffic) * aht
+           / (agents * (1.0 - traffic / agents));
+}
+
+int agents_required(double traffic, double aht,
+                    double sl_goal, double asa_goal) {
+    for (int m = (int)traffic + 1; m < 10000; m++)
+        if (service_level(m, traffic, aht, asa_goal) >= sl_goal
+            && asa(m, traffic, aht) <= asa_goal)
+            return m;
+    return 10000;
+}
+
+/* traffic = calls * aht / period; agents_required(10,180,0.80,20) == 14 */
+</script>
+
+<script type="text/plain" data-lang="Go" data-file="erlangc.go">
+// Package erlangc — call-centre staffing. Standard library only.
+package erlangc
+
+import "math"
+
+func logPois(k int, u float64) float64 {
+	return float64(k)*math.Log(u) - lgamma(k+1) - u
+}
+
+func lgamma(n int) float64 { // math.Lgamma returns (value, sign)
+	v, _ := math.Lgamma(float64(n))
+	return v
+}
+
+// ErlangC is the probability an arriving call has to wait.
+func ErlangC(agents int, traffic float64) float64 {
+	rho := traffic / float64(agents)
+	if rho >= 1 {
+		return 1
+	}
+	top := math.Exp(logPois(agents, traffic))
+	cum := 0.0
+	for k := 0; k < agents; k++ {
+		cum += math.Exp(logPois(k, traffic))
+	}
+	return top / (top + (1-rho)*cum)
+}
+
+// ServiceLevel is the fraction answered within target seconds.
+func ServiceLevel(agents int, traffic, aht, target float64) float64 {
+	if float64(agents) <= traffic {
+		return 0
+	}
+	return 1 - ErlangC(agents, traffic)*math.Exp(-(float64(agents)-traffic)*target/aht)
+}
+
+// ASA is the average speed of answer, in seconds.
+func ASA(agents int, traffic, aht float64) float64 {
+	if float64(agents) <= traffic {
+		return math.Inf(1)
+	}
+	return ErlangC(agents, traffic) * aht / (float64(agents) * (1 - traffic/float64(agents)))
+}
+
+// AgentsRequired is the smallest headcount meeting both goals.
+func AgentsRequired(traffic, aht, slGoal, asaGoal float64) int {
+	for m := int(traffic) + 1; m < 10000; m++ {
+		if ServiceLevel(m, traffic, aht, asaGoal) >= slGoal &&
+			ASA(m, traffic, aht) <= asaGoal {
+			return m
+		}
+	}
+	return 10000
+}
+
+// traffic = calls * aht / period; AgentsRequired(10,180,0.80,20) == 14
+</script>
+
+<script type="text/plain" data-lang="Rust" data-file="erlang_c.rs">
+// Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps).
+const G: f64 = 7.0;
+const C: [f64; 9] = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7,
+];
+
+fn lgamma(mut x: f64) -> f64 {
+    if x < 0.5 {
+        return (std::f64::consts::PI / (std::f64::consts::PI * x).sin()).ln() - lgamma(1.0 - x);
+    }
+    x -= 1.0;
+    let mut a = C[0];
+    let t = x + G + 0.5;
+    for i in 1..9 {
+        a += C[i] / (x + i as f64);
+    }
+    0.5 * (2.0 * std::f64::consts::PI).ln() + (x + 0.5) * t.ln() - t + a.ln()
+}
+
+fn log_pois(k: u32, u: f64) -> f64 {
+    k as f64 * u.ln() - lgamma(k as f64 + 1.0) - u
+}
+
+pub fn erlang_c(agents: u32, traffic: f64) -> f64 {
+    let rho = traffic / agents as f64;
+    if rho >= 1.0 {
+        return 1.0;
+    }
+    let top = log_pois(agents, traffic).exp();
+    let cum: f64 = (0..agents).map(|k| log_pois(k, traffic).exp()).sum();
+    top / (top + (1.0 - rho) * cum)
+}
+
+pub fn service_level(agents: u32, traffic: f64, aht: f64, target: f64) -> f64 {
+    if agents as f64 <= traffic {
+        return 0.0;
+    }
+    1.0 - erlang_c(agents, traffic) * (-(agents as f64 - traffic) * target / aht).exp()
+}
+
+pub fn asa(agents: u32, traffic: f64, aht: f64) -> f64 {
+    if agents as f64 <= traffic {
+        return f64::INFINITY;
+    }
+    erlang_c(agents, traffic) * aht / (agents as f64 * (1.0 - traffic / agents as f64))
+}
+
+pub fn agents_required(traffic: f64, aht: f64, sl_goal: f64, asa_goal: f64) -> u32 {
+    let mut m = traffic as u32 + 1;
+    while m < 10000 {
+        if service_level(m, traffic, aht, asa_goal) >= sl_goal
+            && asa(m, traffic, aht) <= asa_goal
+        {
+            return m;
+        }
+        m += 1;
+    }
+    m
+}
+
+// traffic = calls * aht / period; agents_required(10.0,180.0,0.80,20.0) == 14
+</script>
+
+<script type="text/plain" data-lang="Ruby" data-file="erlang_c.rb">
+# Erlang C — call-centre staffing. Bundled Lanczos lgamma (no gems).
+module ErlangC
+  G = 7
+  C = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+       771.32342877765313, -176.61502916214059, 12.507343278686905,
+       -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7].freeze
+
+  def self.lgamma(x)
+    return Math.log(Math::PI / Math.sin(Math::PI * x)) - lgamma(1 - x) if x < 0.5
+    x -= 1
+    a = C[0]
+    t = x + G + 0.5
+    (1..8).each { |i| a += C[i] / (x + i) }
+    0.5 * Math.log(2 * Math::PI) + (x + 0.5) * Math.log(t) - t + Math.log(a)
+  end
+
+  def self.log_pois(k, u) = k * Math.log(u) - lgamma(k + 1) - u
+
+  def self.wait(agents, traffic)              # P(call has to wait)
+    rho = traffic.to_f / agents
+    return 1.0 if rho >= 1
+    top = Math.exp(log_pois(agents, traffic))
+    cum = (0...agents).sum { |k| Math.exp(log_pois(k, traffic)) }
+    top / (top + (1 - rho) * cum)
+  end
+
+  def self.service_level(agents, traffic, aht, target)
+    return 0.0 if agents <= traffic
+    1 - wait(agents, traffic) * Math.exp(-(agents - traffic) * target / aht)
+  end
+
+  def self.asa(agents, traffic, aht)          # average speed of answer (s)
+    return Float::INFINITY if agents <= traffic
+    wait(agents, traffic) * aht / (agents * (1 - traffic.to_f / agents))
+  end
+
+  def self.agents_required(traffic, aht, sl_goal, asa_goal)
+    m = traffic.to_i + 1
+    while m < 10_000
+      return m if service_level(m, traffic, aht, asa_goal) >= sl_goal &&
+                  asa(m, traffic, aht) <= asa_goal
+      m += 1
+    end
+    m
+  end
+end
+
+# ErlangC.agents_required(10, 180, 0.80, 20)  #=> 14
+</script>
+
+<script type="text/plain" data-lang="Java" data-file="ErlangC.java">
+// Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps).
+public final class ErlangC {
+    private static final double G = 7;
+    private static final double[] C = {
+        0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+        771.32342877765313, -176.61502916214059, 12.507343278686905,
+        -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7
+    };
+
+    static double lgamma(double x) {
+        if (x < 0.5)
+            return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x);
+        x -= 1;
+        double a = C[0], t = x + G + 0.5;
+        for (int i = 1; i < 9; i++) a += C[i] / (x + i);
+        return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+    }
+
+    static double logPois(int k, double u) {
+        return k * Math.log(u) - lgamma(k + 1) - u;
+    }
+
+    public static double erlangC(int agents, double traffic) {   // P(wait)
+        double rho = traffic / agents;
+        if (rho >= 1) return 1;
+        double top = Math.exp(logPois(agents, traffic)), cum = 0;
+        for (int k = 0; k < agents; k++) cum += Math.exp(logPois(k, traffic));
+        return top / (top + (1 - rho) * cum);
+    }
+
+    public static double serviceLevel(int agents, double traffic, double aht, double target) {
+        if (agents <= traffic) return 0;
+        return 1 - erlangC(agents, traffic) * Math.exp(-(agents - traffic) * target / aht);
+    }
+
+    public static double asa(int agents, double traffic, double aht) {
+        if (agents <= traffic) return Double.POSITIVE_INFINITY;
+        return erlangC(agents, traffic) * aht / (agents * (1 - traffic / agents));
+    }
+
+    public static int agentsRequired(double traffic, double aht, double slGoal, double asaGoal) {
+        for (int m = (int) traffic + 1; m < 10000; m++)
+            if (serviceLevel(m, traffic, aht, asaGoal) >= slGoal
+                && asa(m, traffic, aht) <= asaGoal)
+                return m;
+        return 10000;
+    }
+    // agentsRequired(10, 180, 0.80, 20) == 14
+}
+</script>
+
+<script type="text/plain" data-lang="C#" data-file="ErlangC.cs">
+// Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps).
+using System;
+
+public static class ErlangC {
+    const double G = 7;
+    static readonly double[] C = {
+        0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+        771.32342877765313, -176.61502916214059, 12.507343278686905,
+        -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7
+    };
+
+    static double Lgamma(double x) {
+        if (x < 0.5)
+            return Math.Log(Math.PI / Math.Sin(Math.PI * x)) - Lgamma(1 - x);
+        x -= 1;
+        double a = C[0], t = x + G + 0.5;
+        for (int i = 1; i < 9; i++) a += C[i] / (x + i);
+        return 0.5 * Math.Log(2 * Math.PI) + (x + 0.5) * Math.Log(t) - t + Math.Log(a);
+    }
+
+    static double LogPois(int k, double u) => k * Math.Log(u) - Lgamma(k + 1) - u;
+
+    public static double Wait(int agents, double traffic) {      // P(call waits)
+        double rho = traffic / agents;
+        if (rho >= 1) return 1;
+        double top = Math.Exp(LogPois(agents, traffic)), cum = 0;
+        for (int k = 0; k < agents; k++) cum += Math.Exp(LogPois(k, traffic));
+        return top / (top + (1 - rho) * cum);
+    }
+
+    public static double ServiceLevel(int agents, double traffic, double aht, double target) {
+        if (agents <= traffic) return 0;
+        return 1 - Wait(agents, traffic) * Math.Exp(-(agents - traffic) * target / aht);
+    }
+
+    public static double Asa(int agents, double traffic, double aht) {
+        if (agents <= traffic) return double.PositiveInfinity;
+        return Wait(agents, traffic) * aht / (agents * (1 - traffic / agents));
+    }
+
+    public static int AgentsRequired(double traffic, double aht, double slGoal, double asaGoal) {
+        for (int m = (int)traffic + 1; m < 10000; m++)
+            if (ServiceLevel(m, traffic, aht, asaGoal) >= slGoal
+                && Asa(m, traffic, aht) <= asaGoal)
+                return m;
+        return 10000;
+    }
+    // AgentsRequired(10, 180, 0.80, 20) == 14
+}
+</script>
+
+<script type="text/plain" data-lang="Swift" data-file="ErlangC.swift">
+// Erlang C — call-centre staffing. Foundation provides lgamma.
+import Foundation
+
+func logPois(_ k: Int, _ u: Double) -> Double {
+    Double(k) * log(u) - lgamma(Double(k) + 1) - u
+}
+
+// P(an arriving call has to wait)
+func erlangC(agents: Int, traffic: Double) -> Double {
+    let rho = traffic / Double(agents)
+    if rho >= 1 { return 1 }
+    let top = exp(logPois(agents, traffic))
+    var cum = 0.0
+    for k in 0..<agents { cum += exp(logPois(k, traffic)) }
+    return top / (top + (1 - rho) * cum)
+}
+
+func serviceLevel(agents: Int, traffic: Double, aht: Double, target: Double) -> Double {
+    if Double(agents) <= traffic { return 0 }
+    return 1 - erlangC(agents: agents, traffic: traffic)
+             * exp(-(Double(agents) - traffic) * target / aht)
+}
+
+func asa(agents: Int, traffic: Double, aht: Double) -> Double {
+    if Double(agents) <= traffic { return .infinity }
+    return erlangC(agents: agents, traffic: traffic) * aht
+         / (Double(agents) * (1 - traffic / Double(agents)))
+}
+
+func agentsRequired(traffic: Double, aht: Double, slGoal: Double, asaGoal: Double) -> Int {
+    var m = Int(traffic) + 1
+    while m < 10000 {
+        if serviceLevel(agents: m, traffic: traffic, aht: aht, target: asaGoal) >= slGoal,
+           asa(agents: m, traffic: traffic, aht: aht) <= asaGoal { return m }
+        m += 1
+    }
+    return m
+}
+
+// agentsRequired(traffic: 10, aht: 180, slGoal: 0.80, asaGoal: 20) == 14
+</script>
+
+<script type="text/plain" data-lang="PHP" data-file="erlang_c.php">
+&lt;?php
+// Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps).
+const ERLANG_G = 7;
+const ERLANG_C = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+
+function lgamma(float $x): float {
+    if ($x < 0.5)
+        return log(M_PI / sin(M_PI * $x)) - lgamma(1 - $x);
+    $x -= 1;
+    $a = ERLANG_C[0];
+    $t = $x + ERLANG_G + 0.5;
+    for ($i = 1; $i < 9; $i++) $a += ERLANG_C[$i] / ($x + $i);
+    return 0.5 * log(2 * M_PI) + ($x + 0.5) * log($t) - $t + log($a);
+}
+
+function log_pois(int $k, float $u): float {
+    return $k * log($u) - lgamma($k + 1) - $u;
+}
+
+function erlang_c(int $agents, float $traffic): float {   // P(call waits)
+    $rho = $traffic / $agents;
+    if ($rho >= 1) return 1.0;
+    $top = exp(log_pois($agents, $traffic));
+    $cum = 0.0;
+    for ($k = 0; $k < $agents; $k++) $cum += exp(log_pois($k, $traffic));
+    return $top / ($top + (1 - $rho) * $cum);
+}
+
+function service_level(int $agents, float $traffic, float $aht, float $target): float {
+    if ($agents <= $traffic) return 0.0;
+    return 1 - erlang_c($agents, $traffic) * exp(-($agents - $traffic) * $target / $aht);
+}
+
+function asa(int $agents, float $traffic, float $aht): float {
+    if ($agents <= $traffic) return INF;
+    return erlang_c($agents, $traffic) * $aht / ($agents * (1 - $traffic / $agents));
+}
+
+function agents_required(float $traffic, float $aht, float $slGoal, float $asaGoal): int {
+    for ($m = (int)$traffic + 1; $m < 10000; $m++)
+        if (service_level($m, $traffic, $aht, $asaGoal) >= $slGoal
+            && asa($m, $traffic, $aht) <= $asaGoal)
+            return $m;
+    return 10000;
+}
+
+// agents_required(10, 180, 0.80, 20) === 14
+</script>
+
+<script type="text/plain" data-lang="Julia" data-file="ErlangC.jl">
+# Erlang C — call-centre staffing. Base Julia (lgamma via bundled Lanczos).
+const G = 7
+const C = (0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+           771.32342877765313, -176.61502916214059, 12.507343278686905,
+           -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7)
+
+function lgamma(x)
+    x < 0.5 && return log(π / sin(π * x)) - lgamma(1 - x)
+    x -= 1
+    a = C[1]
+    t = x + G + 0.5
+    for i in 1:8
+        a += C[i + 1] / (x + i)
+    end
+    return 0.5 * log(2π) + (x + 0.5) * log(t) - t + log(a)
+end
+
+log_pois(k, u) = k * log(u) - lgamma(k + 1) - u
+
+function erlang_c(agents, traffic)          # P(call has to wait)
+    rho = traffic / agents
+    rho >= 1 && return 1.0
+    top = exp(log_pois(agents, traffic))
+    cum = sum(exp(log_pois(k, traffic)) for k in 0:agents-1)
+    return top / (top + (1 - rho) * cum)
+end
+
+function service_level(agents, traffic, aht, target)
+    agents <= traffic && return 0.0
+    1 - erlang_c(agents, traffic) * exp(-(agents - traffic) * target / aht)
+end
+
+function asa(agents, traffic, aht)          # average speed of answer (s)
+    agents <= traffic && return Inf
+    erlang_c(agents, traffic) * aht / (agents * (1 - traffic / agents))
+end
+
+function agents_required(traffic, aht, sl_goal, asa_goal)
+    m = floor(Int, traffic) + 1
+    while m < 10000
+        service_level(m, traffic, aht, asa_goal) >= sl_goal &&
+            asa(m, traffic, aht) <= asa_goal && return m
+        m += 1
+    end
+    m
+end
+
+# agents_required(10, 180, 0.80, 20) == 14
+</script>
+
+<script type="text/plain" data-lang="Perl" data-file="ErlangC.pl">
+# Erlang C — call-centre staffing. Core Perl + POSIX (bundled Lanczos lgamma).
+use strict;
+use warnings;
+use POSIX qw(floor);
+
+my $G = 7;
+my @C = (0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+         771.32342877765313, -176.61502916214059, 12.507343278686905,
+         -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7);
+use constant PI => 4 * atan2(1, 1);
+
+sub lgamma {
+    my ($x) = @_;
+    return log(PI / sin(PI * $x)) - lgamma(1 - $x) if $x < 0.5;
+    $x -= 1;
+    my $a = $C[0];
+    my $t = $x + $G + 0.5;
+    $a += $C[$_] / ($x + $_) for 1 .. 8;
+    return 0.5 * log(2 * PI) + ($x + 0.5) * log($t) - $t + log($a);
+}
+
+sub log_pois { my ($k, $u) = @_; $k * log($u) - lgamma($k + 1) - $u }
+
+sub erlang_c {                       # P(an arriving call has to wait)
+    my ($agents, $traffic) = @_;
+    my $rho = $traffic / $agents;
+    return 1 if $rho >= 1;
+    my $top = exp(log_pois($agents, $traffic));
+    my $cum = 0;
+    $cum += exp(log_pois($_, $traffic)) for 0 .. $agents - 1;
+    return $top / ($top + (1 - $rho) * $cum);
+}
+
+sub service_level {
+    my ($agents, $traffic, $aht, $target) = @_;
+    return 0 if $agents <= $traffic;
+    1 - erlang_c($agents, $traffic) * exp(-($agents - $traffic) * $target / $aht);
+}
+
+sub asa {
+    my ($agents, $traffic, $aht) = @_;
+    return 9**9**9 if $agents <= $traffic;   # +Inf
+    erlang_c($agents, $traffic) * $aht / ($agents * (1 - $traffic / $agents));
+}
+
+sub agents_required {
+    my ($traffic, $aht, $sl_goal, $asa_goal) = @_;
+    for (my $m = floor($traffic) + 1; $m < 10000; $m++) {
+        return $m if service_level($m, $traffic, $aht, $asa_goal) >= $sl_goal
+                  && asa($m, $traffic, $aht) <= $asa_goal;
+    }
+    return 10000;
+}
+
+# agents_required(10, 180, 0.80, 20)  ==  14
+</script>
+
+<script type="text/plain" data-lang="TypeScript" data-file="erlang_c.ts">
+// Erlang C — call-centre staffing. Self-contained; no dependencies.
+const G = 7;
+const C = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+           771.32342877765313, -176.61502916214059, 12.507343278686905,
+           -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+
+function lgamma(x: number): number {
+  if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x);
+  x -= 1;
+  let a = C[0];
+  const t = x + G + 0.5;
+  for (let i = 1; i < 9; i++) a += C[i] / (x + i);
+  return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+}
+const logPois = (k: number, u: number): number => k * Math.log(u) - lgamma(k + 1) - u;
+
+export function erlangC(agents: number, traffic: number): number {
+  const rho = traffic / agents;
+  if (rho >= 1) return 1;
+  const top = Math.exp(logPois(agents, traffic));
+  let cum = 0;
+  for (let k = 0; k < agents; k++) cum += Math.exp(logPois(k, traffic));
+  return top / (top + (1 - rho) * cum);
+}
+
+export function serviceLevel(agents: number, traffic: number, aht: number, target: number): number {
+  if (agents <= traffic) return 0;
+  return 1 - erlangC(agents, traffic) * Math.exp(-(agents - traffic) * target / aht);
+}
+
+export function asa(agents: number, traffic: number, aht: number): number {
+  if (agents <= traffic) return Infinity;
+  return erlangC(agents, traffic) * aht / (agents * (1 - traffic / agents));
+}
+
+export function agentsRequired(traffic: number, aht: number, slGoal: number, asaGoal: number): number {
+  let m = Math.floor(traffic) + 1;
+  while (m < 10000) {
+    if (serviceLevel(m, traffic, aht, asaGoal) >= slGoal && asa(m, traffic, aht) <= asaGoal) return m;
+    m++;
+  }
+  return m;
+}
+// agentsRequired(10, 180, 0.80, 20) === 14
+</script>
+
+<script type="text/plain" data-lang="Kotlin" data-file="ErlangC.kt">
+// Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps).
+import kotlin.math.*
+
+private val C = doubleArrayOf(
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7)
+
+fun lgamma(x0: Double): Double {
+    if (x0 < 0.5) return ln(PI / sin(PI * x0)) - lgamma(1 - x0)
+    val x = x0 - 1
+    var a = C[0]
+    val t = x + 7.5
+    for (i in 1..8) a += C[i] / (x + i)
+    return 0.5 * ln(2 * PI) + (x + 0.5) * ln(t) - t + ln(a)
+}
+
+private fun logPois(k: Int, u: Double) = k * ln(u) - lgamma(k + 1.0) - u
+
+fun erlangC(agents: Int, traffic: Double): Double {
+    val rho = traffic / agents
+    if (rho >= 1) return 1.0
+    val top = exp(logPois(agents, traffic))
+    var cum = 0.0
+    for (k in 0 until agents) cum += exp(logPois(k, traffic))
+    return top / (top + (1 - rho) * cum)
+}
+
+fun serviceLevel(agents: Int, traffic: Double, aht: Double, target: Double): Double {
+    if (agents <= traffic) return 0.0
+    return 1 - erlangC(agents, traffic) * exp(-(agents - traffic) * target / aht)
+}
+
+fun asa(agents: Int, traffic: Double, aht: Double): Double {
+    if (agents <= traffic) return Double.POSITIVE_INFINITY
+    return erlangC(agents, traffic) * aht / (agents * (1 - traffic / agents))
+}
+
+fun agentsRequired(traffic: Double, aht: Double, slGoal: Double, asaGoal: Double): Int {
+    var m = traffic.toInt() + 1
+    while (m < 10000) {
+        if (serviceLevel(m, traffic, aht, asaGoal) >= slGoal && asa(m, traffic, aht) <= asaGoal) return m
+        m++
+    }
+    return m
+}
+// agentsRequired(10.0, 180.0, 0.80, 20.0) == 14
+</script>
+
+<script type="text/plain" data-lang="Scala" data-file="ErlangC.scala">
+// Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps).
+import scala.math._
+
+object ErlangC {
+  private val C = Array(0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7)
+
+  def lgamma(x0: Double): Double = {
+    if (x0 < 0.5) return log(Pi / sin(Pi * x0)) - lgamma(1 - x0)
+    val x = x0 - 1
+    var a = C(0)
+    val t = x + 7.5
+    for (i <- 1 to 8) a += C(i) / (x + i)
+    0.5 * log(2 * Pi) + (x + 0.5) * log(t) - t + log(a)
+  }
+
+  private def logPois(k: Int, u: Double) = k * log(u) - lgamma(k + 1) - u
+
+  def erlangC(agents: Int, traffic: Double): Double = {
+    val rho = traffic / agents
+    if (rho >= 1) return 1.0
+    val top = exp(logPois(agents, traffic))
+    var cum = 0.0
+    for (k <- 0 until agents) cum += exp(logPois(k, traffic))
+    top / (top + (1 - rho) * cum)
+  }
+
+  def serviceLevel(agents: Int, traffic: Double, aht: Double, target: Double): Double =
+    if (agents <= traffic) 0.0
+    else 1 - erlangC(agents, traffic) * exp(-(agents - traffic) * target / aht)
+
+  def asa(agents: Int, traffic: Double, aht: Double): Double =
+    if (agents <= traffic) Double.PositiveInfinity
+    else erlangC(agents, traffic) * aht / (agents * (1 - traffic / agents))
+
+  def agentsRequired(traffic: Double, aht: Double, slGoal: Double, asaGoal: Double): Int = {
+    var m = traffic.toInt + 1
+    while (m < 10000) {
+      if (serviceLevel(m, traffic, aht, asaGoal) >= slGoal && asa(m, traffic, aht) <= asaGoal) return m
+      m += 1
+    }
+    m
+  }
+}
+// ErlangC.agentsRequired(10, 180, 0.80, 20) == 14
+</script>
+
+<script type="text/plain" data-lang="F#" data-file="ErlangC.fs">
+// Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps).
+module ErlangC
+
+let private pi = System.Math.PI
+let private c = [| 0.99999999999980993; 676.5203681218851; -1259.1392167224028;
+                   771.32342877765313; -176.61502916214059; 12.507343278686905;
+                   -0.13857109526572012; 9.9843695780195716e-6; 1.5056327351493116e-7 |]
+
+let rec lgamma x =
+    if x < 0.5 then log (pi / sin (pi * x)) - lgamma (1.0 - x)
+    else
+        let x = x - 1.0
+        let t = x + 7.5
+        let mutable a = c.[0]
+        for i in 1..8 do a <- a + c.[i] / (x + float i)
+        0.5 * log (2.0 * pi) + (x + 0.5) * log t - t + log a
+
+let private logPois k u = float k * log u - lgamma (float k + 1.0) - u
+
+let erlangC agents traffic =
+    let rho = traffic / float agents
+    if rho >= 1.0 then 1.0
+    else
+        let top = exp (logPois agents traffic)
+        let cum = [0 .. agents - 1] |> List.sumBy (fun k -> exp (logPois k traffic))
+        top / (top + (1.0 - rho) * cum)
+
+let serviceLevel agents traffic aht target =
+    if float agents <= traffic then 0.0
+    else 1.0 - erlangC agents traffic * exp (-(float agents - traffic) * target / aht)
+
+let asa agents traffic aht =
+    if float agents <= traffic then infinity
+    else erlangC agents traffic * aht / (float agents * (1.0 - traffic / float agents))
+
+let agentsRequired traffic aht slGoal asaGoal =
+    seq { int traffic + 1 .. 9999 }
+    |> Seq.find (fun m -> serviceLevel m traffic aht asaGoal >= slGoal
+                          && asa m traffic aht <= asaGoal)
+// agentsRequired 10.0 180.0 0.80 20.0  =  14
+</script>
+
+<script type="text/plain" data-lang="Clojure" data-file="erlang_c.clj">
+;; Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps).
+(ns erlang-c)
+
+(def ^:private C
+  [0.99999999999980993 676.5203681218851 -1259.1392167224028
+   771.32342877765313 -176.61502916214059 12.507343278686905
+   -0.13857109526572012 9.9843695780195716e-6 1.5056327351493116e-7])
+
+(defn lgamma [x]
+  (if (< x 0.5)
+    (- (Math/log (/ Math/PI (Math/sin (* Math/PI x)))) (lgamma (- 1.0 x)))
+    (let [x (- x 1.0)
+          t (+ x 7.5)
+          a (reduce (fn [a i] (+ a (/ (C i) (+ x i)))) (C 0) (range 1 9))]
+      (+ (* 0.5 (Math/log (* 2.0 Math/PI))) (* (+ x 0.5) (Math/log t)) (- t) (Math/log a)))))
+
+(defn- log-pois [k u] (- (* k (Math/log u)) (lgamma (+ k 1.0)) u))
+
+(defn erlang-c [agents traffic]
+  (let [rho (/ traffic agents)]
+    (if (>= rho 1) 1.0
+      (let [top (Math/exp (log-pois agents traffic))
+            cum (reduce + (map #(Math/exp (log-pois % traffic)) (range agents)))]
+        (/ top (+ top (* (- 1 rho) cum)))))))
+
+(defn service-level [agents traffic aht target]
+  (if (<= agents traffic) 0.0
+    (- 1 (* (erlang-c agents traffic)
+            (Math/exp (- (/ (* (- agents traffic) target) aht)))))))
+
+(defn asa [agents traffic aht]
+  (if (<= agents traffic) Double/POSITIVE_INFINITY
+    (/ (* (erlang-c agents traffic) aht) (* agents (- 1 (/ traffic agents))))))
+
+(defn agents-required [traffic aht sl-goal asa-goal]
+  (loop [m (inc (int traffic))]
+    (if (or (>= m 10000)
+            (and (>= (service-level m traffic aht asa-goal) sl-goal)
+                 (<= (asa m traffic aht) asa-goal)))
+      m
+      (recur (inc m)))))
+;; (agents-required 10 180 0.80 20)  =>  14
+</script>
+
+<script type="text/plain" data-lang="Haskell" data-file="ErlangC.hs">
+-- Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps).
+module ErlangC where
+
+cs :: [Double]
+cs = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+      771.32342877765313, -176.61502916214059, 12.507343278686905,
+      -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7]
+
+lgamma :: Double -> Double
+lgamma x
+  | x < 0.5   = log (pi / sin (pi * x)) - lgamma (1 - x)
+  | otherwise =
+      let y = x - 1
+          t = y + 7.5
+          a = head cs + sum [cs !! i / (y + fromIntegral i) | i <- [1 .. 8]]
+      in 0.5 * log (2 * pi) + (y + 0.5) * log t - t + log a
+
+logPois :: Int -> Double -> Double
+logPois k u = fromIntegral k * log u - lgamma (fromIntegral k + 1) - u
+
+erlangC :: Int -> Double -> Double
+erlangC agents traffic
+  | rho >= 1  = 1
+  | otherwise = top / (top + (1 - rho) * cum)
+  where rho = traffic / fromIntegral agents
+        top = exp (logPois agents traffic)
+        cum = sum [exp (logPois k traffic) | k <- [0 .. agents - 1]]
+
+serviceLevel :: Int -> Double -> Double -> Double -> Double
+serviceLevel agents traffic aht target
+  | fromIntegral agents <= traffic = 0
+  | otherwise = 1 - erlangC agents traffic
+                    * exp (-(fromIntegral agents - traffic) * target / aht)
+
+asa :: Int -> Double -> Double -> Double
+asa agents traffic aht
+  | fromIntegral agents <= traffic = 1 / 0
+  | otherwise = erlangC agents traffic * aht
+                / (fromIntegral agents * (1 - traffic / fromIntegral agents))
+
+agentsRequired :: Double -> Double -> Double -> Double -> Int
+agentsRequired traffic aht slGoal asaGoal =
+  head [ m | m <- [floor traffic + 1 ..]
+           , serviceLevel m traffic aht asaGoal >= slGoal
+           , asa m traffic aht <= asaGoal ]
+-- agentsRequired 10 180 0.80 20  ==  14
+</script>
+
+<script type="text/plain" data-lang="Elixir" data-file="erlang_c.ex">
+# Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps).
+defmodule ErlangC do
+  @c [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+      771.32342877765313, -176.61502916214059, 12.507343278686905,
+      -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7]
+
+  def lgamma(x) when x < 0.5,
+    do: :math.log(:math.pi() / :math.sin(:math.pi() * x)) - lgamma(1 - x)
+
+  def lgamma(x) do
+    x = x - 1
+    t = x + 7.5
+    a = Enum.reduce(1..8, hd(@c), fn i, a -> a + Enum.at(@c, i) / (x + i) end)
+    0.5 * :math.log(2 * :math.pi()) + (x + 0.5) * :math.log(t) - t + :math.log(a)
+  end
+
+  defp log_pois(k, u), do: k * :math.log(u) - lgamma(k + 1) - u
+
+  def erlang_c(agents, traffic) do
+    rho = traffic / agents
+    if rho >= 1 do
+      1.0
+    else
+      top = :math.exp(log_pois(agents, traffic))
+      cum = Enum.reduce(0..(agents - 1), 0.0, fn k, s -> s + :math.exp(log_pois(k, traffic)) end)
+      top / (top + (1 - rho) * cum)
+    end
+  end
+
+  def service_level(agents, traffic, aht, target) do
+    if agents <= traffic,
+      do: 0.0,
+      else: 1 - erlang_c(agents, traffic) * :math.exp(-(agents - traffic) * target / aht)
+  end
+
+  def asa(agents, traffic, aht) do
+    if agents <= traffic,
+      do: :infinity,
+      else: erlang_c(agents, traffic) * aht / (agents * (1 - traffic / agents))
+  end
+
+  def agents_required(traffic, aht, sl_goal, asa_goal) do
+    Stream.iterate(trunc(traffic) + 1, &(&1 + 1))
+    |> Enum.find(fn m ->
+      service_level(m, traffic, aht, asa_goal) >= sl_goal and
+        asa(m, traffic, aht) <= asa_goal
+    end)
+  end
+end
+# ErlangC.agents_required(10, 180, 0.80, 20)  #=> 14
+</script>
+
+<script type="text/plain" data-lang="Lua" data-file="erlang_c.lua">
+-- Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps).
+local C = {0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+           771.32342877765313, -176.61502916214059, 12.507343278686905,
+           -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7}
+
+local function lgamma(x)
+  if x < 0.5 then
+    return math.log(math.pi / math.sin(math.pi * x)) - lgamma(1 - x)
+  end
+  x = x - 1
+  local a = C[1]
+  local t = x + 7.5
+  for i = 1, 8 do a = a + C[i + 1] / (x + i) end
+  return 0.5 * math.log(2 * math.pi) + (x + 0.5) * math.log(t) - t + math.log(a)
+end
+
+local function log_pois(k, u) return k * math.log(u) - lgamma(k + 1) - u end
+
+local function erlang_c(agents, traffic)          -- P(call has to wait)
+  local rho = traffic / agents
+  if rho >= 1 then return 1.0 end
+  local top = math.exp(log_pois(agents, traffic))
+  local cum = 0.0
+  for k = 0, agents - 1 do cum = cum + math.exp(log_pois(k, traffic)) end
+  return top / (top + (1 - rho) * cum)
+end
+
+local function service_level(agents, traffic, aht, target)
+  if agents <= traffic then return 0.0 end
+  return 1 - erlang_c(agents, traffic) * math.exp(-(agents - traffic) * target / aht)
+end
+
+local function asa(agents, traffic, aht)
+  if agents <= traffic then return math.huge end
+  return erlang_c(agents, traffic) * aht / (agents * (1 - traffic / agents))
+end
+
+local function agents_required(traffic, aht, sl_goal, asa_goal)
+  local m = math.floor(traffic) + 1
+  while m < 10000 do
+    if service_level(m, traffic, aht, asa_goal) >= sl_goal
+       and asa(m, traffic, aht) <= asa_goal then return m end
+    m = m + 1
+  end
+  return m
+end
+-- agents_required(10, 180, 0.80, 20)  ==  14
+</script>
+
+<script type="text/plain" data-lang="Dart" data-file="erlang_c.dart">
+// Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps).
+import 'dart:math';
+
+const _c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+            771.32342877765313, -176.61502916214059, 12.507343278686905,
+            -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+
+double lgamma(double x) {
+  if (x < 0.5) return log(pi / sin(pi * x)) - lgamma(1 - x);
+  x -= 1;
+  var a = _c[0];
+  final t = x + 7.5;
+  for (var i = 1; i < 9; i++) a += _c[i] / (x + i);
+  return 0.5 * log(2 * pi) + (x + 0.5) * log(t) - t + log(a);
+}
+
+double _logPois(int k, double u) => k * log(u) - lgamma(k + 1) - u;
+
+double erlangC(int agents, double traffic) {
+  final rho = traffic / agents;
+  if (rho >= 1) return 1;
+  final top = exp(_logPois(agents, traffic));
+  var cum = 0.0;
+  for (var k = 0; k < agents; k++) cum += exp(_logPois(k, traffic));
+  return top / (top + (1 - rho) * cum);
+}
+
+double serviceLevel(int agents, double traffic, double aht, double target) {
+  if (agents <= traffic) return 0;
+  return 1 - erlangC(agents, traffic) * exp(-(agents - traffic) * target / aht);
+}
+
+double asa(int agents, double traffic, double aht) {
+  if (agents <= traffic) return double.infinity;
+  return erlangC(agents, traffic) * aht / (agents * (1 - traffic / agents));
+}
+
+int agentsRequired(double traffic, double aht, double slGoal, double asaGoal) {
+  for (var m = traffic.floor() + 1; m < 10000; m++) {
+    if (serviceLevel(m, traffic, aht, asaGoal) >= slGoal &&
+        asa(m, traffic, aht) <= asaGoal) return m;
+  }
+  return 10000;
+}
+// agentsRequired(10, 180, 0.80, 20) == 14
+</script>
+
+<script type="text/plain" data-lang="Nim" data-file="erlang_c.nim">
+# Erlang C — call-centre staffing. Standard library (math.lgamma).
+import std/math
+
+proc logPois(k: int, u: float): float =
+  float(k) * ln(u) - lgamma(float(k) + 1.0) - u
+
+proc erlangC*(agents: int, traffic: float): float =
+  let rho = traffic / float(agents)
+  if rho >= 1.0: return 1.0
+  let top = exp(logPois(agents, traffic))
+  var cum = 0.0
+  for k in 0 ..< agents: cum += exp(logPois(k, traffic))
+  top / (top + (1.0 - rho) * cum)
+
+proc serviceLevel*(agents: int, traffic, aht, target: float): float =
+  if float(agents) <= traffic: return 0.0
+  1.0 - erlangC(agents, traffic) * exp(-(float(agents) - traffic) * target / aht)
+
+proc asa*(agents: int, traffic, aht: float): float =
+  if float(agents) <= traffic: return Inf
+  erlangC(agents, traffic) * aht / (float(agents) * (1.0 - traffic / float(agents)))
+
+proc agentsRequired*(traffic, aht, slGoal, asaGoal: float): int =
+  var m = int(traffic) + 1
+  while m < 10000:
+    if serviceLevel(m, traffic, aht, asaGoal) >= slGoal and
+       asa(m, traffic, aht) <= asaGoal: return m
+    inc m
+  m
+# agentsRequired(10, 180, 0.80, 20) == 14
+</script>
+
+<script type="text/plain" data-lang="Zig" data-file="erlang_c.zig">
+// Erlang C — call-centre staffing. Bundled Lanczos lgamma (no deps). Modern Zig.
+const std = @import("std");
+const pi = std.math.pi;
+
+const C = [_]f64{ 0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7 };
+
+fn lgamma(x0: f64) f64 {
+    if (x0 < 0.5) return @log(pi / @sin(pi * x0)) - lgamma(1.0 - x0);
+    const x = x0 - 1.0;
+    const t = x + 7.5;
+    var a = C[0];
+    var i: usize = 1;
+    while (i < 9) : (i += 1) a += C[i] / (x + @as(f64, @floatFromInt(i)));
+    return 0.5 * @log(2.0 * pi) + (x + 0.5) * @log(t) - t + @log(a);
+}
+
+fn logPois(k: u32, u: f64) f64 {
+    const kf = @as(f64, @floatFromInt(k));
+    return kf * @log(u) - lgamma(kf + 1.0) - u;
+}
+
+pub fn erlangC(agents: u32, traffic: f64) f64 {
+    const a = @as(f64, @floatFromInt(agents));
+    const rho = traffic / a;
+    if (rho >= 1.0) return 1.0;
+    const top = @exp(logPois(agents, traffic));
+    var cum: f64 = 0.0;
+    var k: u32 = 0;
+    while (k < agents) : (k += 1) cum += @exp(logPois(k, traffic));
+    return top / (top + (1.0 - rho) * cum);
+}
+
+pub fn serviceLevel(agents: u32, traffic: f64, aht: f64, target: f64) f64 {
+    const a = @as(f64, @floatFromInt(agents));
+    if (a <= traffic) return 0.0;
+    return 1.0 - erlangC(agents, traffic) * @exp(-(a - traffic) * target / aht);
+}
+
+pub fn asa(agents: u32, traffic: f64, aht: f64) f64 {
+    const a = @as(f64, @floatFromInt(agents));
+    if (a <= traffic) return std.math.inf(f64);
+    return erlangC(agents, traffic) * aht / (a * (1.0 - traffic / a));
+}
+
+pub fn agentsRequired(traffic: f64, aht: f64, slGoal: f64, asaGoal: f64) u32 {
+    var m: u32 = @as(u32, @intFromFloat(traffic)) + 1;
+    while (m < 10000) : (m += 1) {
+        if (serviceLevel(m, traffic, aht, asaGoal) >= slGoal and
+            asa(m, traffic, aht) <= asaGoal) return m;
+    }
+    return m;
+}
+// agentsRequired(10, 180, 0.80, 20) == 14
+</script>
+
+<script type="text/plain" data-lang="Fortran" data-file="erlang_c.f90">
+! Erlang C — call-centre staffing. Fortran 2008 (log_gamma intrinsic).
+module erlang_c
+  implicit none
+  integer, parameter :: dp = kind(1.0d0)
+contains
+
+  pure function log_pois(k, u) result(r)
+    integer, intent(in)  :: k
+    real(dp), intent(in) :: u
+    real(dp) :: r
+    r = k * log(u) - log_gamma(real(k + 1, dp)) - u
+  end function
+
+  recursive function erlangc(agents, traffic) result(p)   ! P(call has to wait)
+    integer, intent(in)  :: agents
+    real(dp), intent(in) :: traffic
+    real(dp) :: p, rho, top, cum
+    integer  :: k
+    rho = traffic / agents
+    if (rho >= 1.0_dp) then
+      p = 1.0_dp; return
+    end if
+    top = exp(log_pois(agents, traffic))
+    cum = 0.0_dp
+    do k = 0, agents - 1
+      cum = cum + exp(log_pois(k, traffic))
+    end do
+    p = top / (top + (1.0_dp - rho) * cum)
+  end function
+
+  function service_level(agents, traffic, aht, target) result(sl)
+    integer, intent(in)  :: agents
+    real(dp), intent(in) :: traffic, aht, target
+    real(dp) :: sl
+    if (agents <= traffic) then
+      sl = 0.0_dp; return
+    end if
+    sl = 1.0_dp - erlangc(agents, traffic) * exp(-(agents - traffic) * target / aht)
+  end function
+
+  function asa(agents, traffic, aht) result(a)
+    integer, intent(in)  :: agents
+    real(dp), intent(in) :: traffic, aht
+    real(dp) :: a
+    if (agents <= traffic) then
+      a = huge(1.0_dp); return
+    end if
+    a = erlangc(agents, traffic) * aht / (agents * (1.0_dp - traffic / agents))
+  end function
+
+  integer function agents_required(traffic, aht, sl_goal, asa_goal) result(m)
+    real(dp), intent(in) :: traffic, aht, sl_goal, asa_goal
+    m = int(traffic) + 1
+    do while (m < 10000)
+      if (service_level(m, traffic, aht, asa_goal) >= sl_goal .and. &
+          asa(m, traffic, aht) <= asa_goal) return
+      m = m + 1
+    end do
+  end function
+end module
+! agents_required(10.0d0, 180.0d0, 0.80d0, 20.0d0) == 14
+</script>
+
+<script type="text/plain" data-lang="Objective-C" data-file="ErlangC.m">
+// Erlang C — call-centre staffing. Foundation + libm (lgamma).
+#import <Foundation/Foundation.h>
+#import <math.h>
+
+static double logPois(int k, double u) {
+    return k * log(u) - lgamma(k + 1.0) - u;
+}
+
+double ErlangC(int agents, double traffic) {        // P(call has to wait)
+    double rho = traffic / agents;
+    if (rho >= 1.0) return 1.0;
+    double top = exp(logPois(agents, traffic));
+    double cum = 0.0;
+    for (int k = 0; k < agents; k++) cum += exp(logPois(k, traffic));
+    return top / (top + (1.0 - rho) * cum);
+}
+
+double ServiceLevel(int agents, double traffic, double aht, double target) {
+    if (agents <= traffic) return 0.0;
+    return 1.0 - ErlangC(agents, traffic) * exp(-(agents - traffic) * target / aht);
+}
+
+double ASA(int agents, double traffic, double aht) {
+    if (agents <= traffic) return INFINITY;
+    return ErlangC(agents, traffic) * aht / (agents * (1.0 - traffic / agents));
+}
+
+int AgentsRequired(double traffic, double aht, double slGoal, double asaGoal) {
+    for (int m = (int)traffic + 1; m < 10000; m++)
+        if (ServiceLevel(m, traffic, aht, asaGoal) >= slGoal
+            && ASA(m, traffic, aht) <= asaGoal)
+            return m;
+    return 10000;
+}
+// Fun fact: the original CallForecaster + ErlangC iOS/Mac apps were written in this.
+// AgentsRequired(10, 180, 0.80, 20) == 14
+</script>
+
+<script type="text/plain" data-lang="VBA" data-file="ErlangC.bas">
+' Erlang C — call-centre staffing. Excel VBA (WorksheetFunction.GammaLn).
+Option Explicit
+
+Private Function LogPois(ByVal k As Long, ByVal u As Double) As Double
+    LogPois = k * Log(u) - Application.WorksheetFunction.GammaLn(k + 1) - u
+End Function
+
+Public Function ErlangC(ByVal agents As Long, ByVal traffic As Double) As Double
+    Dim rho As Double, top As Double, cum As Double, k As Long
+    rho = traffic / agents
+    If rho >= 1 Then ErlangC = 1: Exit Function
+    top = Exp(LogPois(agents, traffic))
+    For k = 0 To agents - 1
+        cum = cum + Exp(LogPois(k, traffic))
+    Next k
+    ErlangC = top / (top + (1 - rho) * cum)
+End Function
+
+Public Function ServiceLevel(ByVal agents As Long, ByVal traffic As Double, _
+                             ByVal aht As Double, ByVal target As Double) As Double
+    If agents <= traffic Then ServiceLevel = 0: Exit Function
+    ServiceLevel = 1 - ErlangC(agents, traffic) * Exp(-(agents - traffic) * target / aht)
+End Function
+
+Public Function ASA(ByVal agents As Long, ByVal traffic As Double, _
+                    ByVal aht As Double) As Double
+    If agents <= traffic Then ASA = 1E+308: Exit Function   ' +infinity proxy
+    ASA = ErlangC(agents, traffic) * aht / (agents * (1 - traffic / agents))
+End Function
+
+Public Function AgentsRequired(ByVal traffic As Double, ByVal aht As Double, _
+                               ByVal slGoal As Double, ByVal asaGoal As Double) As Long
+    Dim m As Long
+    For m = Int(traffic) + 1 To 9999
+        If ServiceLevel(m, traffic, aht, asaGoal) >= slGoal _
+           And ASA(m, traffic, aht) <= asaGoal Then
+            AgentsRequired = m: Exit Function
+        End If
+    Next m
+    AgentsRequired = 10000
+End Function
+' Log() is natural log in VBA.  =AgentsRequired(10,180,0.8,20)  ->  14
+</script>
+
+<script type="text/plain" data-lang="SQL" data-file="erlang_c.sql">
+-- Erlang C — call-centre staffing. PostgreSQL / PL-pgSQL (bundled Lanczos lgamma).
+CREATE FUNCTION lgamma(x double precision) RETURNS double precision AS $$
+DECLARE
+  c double precision[] := ARRAY[0.99999999999980993, 676.5203681218851,
+    -1259.1392167224028, 771.32342877765313, -176.61502916214059,
+    12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6,
+    1.5056327351493116e-7];
+  a double precision; t double precision; i int;
+BEGIN
+  IF x < 0.5 THEN
+    RETURN ln(pi() / sin(pi() * x)) - lgamma(1 - x);
+  END IF;
+  x := x - 1; a := c[1]; t := x + 7.5;
+  FOR i IN 1..8 LOOP a := a + c[i + 1] / (x + i); END LOOP;
+  RETURN 0.5 * ln(2 * pi()) + (x + 0.5) * ln(t) - t + ln(a);
+END; $$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE FUNCTION erlang_c(agents int, traffic double precision)
+RETURNS double precision AS $$
+DECLARE top double precision; cum double precision; rho double precision;
+BEGIN
+  rho := traffic / agents;
+  IF rho >= 1 THEN RETURN 1; END IF;
+  top := exp(agents * ln(traffic) - lgamma(agents + 1) - traffic);
+  SELECT sum(exp(k * ln(traffic) - lgamma(k + 1) - traffic))
+    INTO cum FROM generate_series(0, agents - 1) AS k;
+  RETURN top / (top + (1 - rho) * cum);
+END; $$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE FUNCTION service_level(agents int, traffic double precision,
+                              aht double precision, target double precision)
+RETURNS double precision AS $$
+  SELECT CASE WHEN agents <= traffic THEN 0
+    ELSE 1 - erlang_c(agents, traffic) * exp(-(agents - traffic) * target / aht) END;
+$$ LANGUAGE sql IMMUTABLE;
+
+CREATE FUNCTION asa(agents int, traffic double precision, aht double precision)
+RETURNS double precision AS $$
+  SELECT CASE WHEN agents <= traffic THEN 'infinity'::double precision
+    ELSE erlang_c(agents, traffic) * aht / (agents * (1 - traffic / agents)) END;
+$$ LANGUAGE sql IMMUTABLE;
+
+CREATE FUNCTION agents_required(traffic double precision, aht double precision,
+                                sl_goal double precision, asa_goal double precision)
+RETURNS int AS $$
+  SELECT min(m) FROM generate_series(floor(traffic)::int + 1, 10000) AS m
+   WHERE service_level(m, traffic, aht, asa_goal) >= sl_goal
+     AND asa(m, traffic, aht) <= asa_goal;
+$$ LANGUAGE sql IMMUTABLE;
+
+-- SELECT agents_required(10, 180, 0.80, 20);   -->  14
+</script>
+
+<script type="text/plain" data-lang="MATLAB / Octave" data-file="erlang_c.m">
+% Erlang C — call-centre staffing. MATLAB / Octave (gammaln built in).
+
+function p = erlang_c(agents, traffic)      % P(call has to wait)
+  rho = traffic / agents;
+  if rho >= 1, p = 1; return; end
+  lp  = @(k) k .* log(traffic) - gammaln(k + 1) - traffic;
+  top = exp(lp(agents));
+  cum = sum(exp(lp(0:agents-1)));
+  p = top / (top + (1 - rho) * cum);
+end
+
+function sl = service_level(agents, traffic, aht, target)
+  if agents <= traffic, sl = 0; return; end
+  sl = 1 - erlang_c(agents, traffic) * exp(-(agents - traffic) * target / aht);
+end
+
+function a = asa(agents, traffic, aht)      % average speed of answer (s)
+  if agents <= traffic, a = Inf; return; end
+  a = erlang_c(agents, traffic) * aht / (agents * (1 - traffic / agents));
+end
+
+function m = agents_required(traffic, aht, sl_goal, asa_goal)
+  m = floor(traffic) + 1;
+  while m < 10000
+    if service_level(m, traffic, aht, asa_goal) >= sl_goal && ...
+       asa(m, traffic, aht) <= asa_goal
+      return
+    end
+    m = m + 1;
+  end
+end
+% agents_required(10, 180, 0.80, 20)  ->  14
+</script>
+
+<script type="text/plain" data-lang="Excel" data-file="erlang_c.xlsx">
+Erlang C — call-centre staffing, as Excel formulas (no VBA, no add-in).
+GAMMALN keeps it numerically stable at any centre size.
+
+Name these input cells:
+    calls = 100     mins = 30      aht = 180
+    sl_goal = 0.8   tsecs = 20
+
+Offered load, in Erlangs:
+    u   =  calls * aht / (mins * 60)                     ->  10
+
+Put a trial agent count in A2 and fill down (11, 12, 13, ...):
+    Occupancy       B2:  = $u / A2
+    P(wait), Erlang C   C2:
+        = LET( p, EXP(A2*LN($u) - GAMMALN(A2+1) - $u),
+               s, SUMPRODUCT( EXP( SEQUENCE(A2,1,0)*LN($u)
+                                   - GAMMALN(SEQUENCE(A2,1,0)+1) - $u ) ),
+               p / ( p + (1-B2) * s ) )
+    Service level   D2:  = IF(A2<=$u, 0, 1 - C2*EXP(-(A2-$u)*$tsecs/$aht))
+    ASA, seconds    E2:  = IF(A2<=$u, "inf", C2*$aht/(A2*(1-B2)))
+
+Agents required (after filling A2:A50 with 11,12,13,...):
+    = MIN( IF( (D2:D50 >= $sl_goal) * (E2:E50 <= $tsecs), A2:A50 ) )   ->  14
+      (Excel 365 spills automatically; pre-365 enter with Ctrl+Shift+Enter.)
+
+The LET+SEQUENCE version needs Excel 365. Pre-365: build the k = 0..agents-1
+Poisson terms in a helper column and SUM them for C2.
+</script>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---- theme toggle ---- */
+  var root=document.documentElement, tbtn=document.getElementById("theme");
+  function current(){
+    var set=root.getAttribute("data-theme");
+    if(set) return set;
+    return matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light";
+  }
+  tbtn.addEventListener("click",function(){
+    root.setAttribute("data-theme", current()==="dark"?"light":"dark");
+  });
+
+  /* ---- verified Erlang C (same algorithm as the reference impls) ---- */
+  var G=7, C=[0.99999999999980993,676.5203681218851,-1259.1392167224028,
+    771.32342877765313,-176.61502916214059,12.507343278686905,
+    -0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  function lgamma(x){
+    if(x<0.5) return Math.log(Math.PI/Math.sin(Math.PI*x))-lgamma(1-x);
+    x-=1; var a=C[0], t=x+G+0.5;
+    for(var i=1;i<9;i++) a+=C[i]/(x+i);
+    return 0.5*Math.log(2*Math.PI)+(x+0.5)*Math.log(t)-t+Math.log(a);
+  }
+  function lp(k,u){return k*Math.log(u)-lgamma(k+1)-u;}
+  function erlangC(m,u){
+    var rho=u/m; if(rho>=1) return 1;
+    var top=Math.exp(lp(m,u)), cum=0;
+    for(var k=0;k<m;k++) cum+=Math.exp(lp(k,u));
+    return top/(top+(1-rho)*cum);
+  }
+  function sl(m,u,aht,t){ if(m<=u) return 0; return 1-erlangC(m,u)*Math.exp(-(m-u)*t/aht); }
+  function asa(m,u,aht){ if(m<=u) return Infinity; return erlangC(m,u)*aht/(m*(1-u/m)); }
+  function required(u,aht,slg,asag){ var m=Math.floor(u)+1; while(m<10000){ if(sl(m,u,aht,asag)>=slg && asa(m,u,aht)<=asag) return m; m++; } return m; }
+
+  /* ---- calculator wiring ---- */
+  var els={calls:"calls",mins:"mins",aht:"aht",sl:"sl",tsecs:"tsecs"};
+  Object.keys(els).forEach(function(k){ els[k]=document.getElementById(els[k]); });
+  var uOut=document.getElementById("uOut"), agentsOut=document.getElementById("agents"),
+      chips=document.getElementById("chips"), rows=document.getElementById("rows"),
+      echo=document.getElementById("targetEcho");
+
+  function num(el,min){ var v=parseFloat(el.value); return (isFinite(v)&&v>=min)?v:NaN; }
+  function fmtSec(s){ return isFinite(s)? (s<10? s.toFixed(1): Math.round(s))+"s" : "∞"; }
+
+  function compute(){
+    var calls=num(els.calls,1), mins=num(els.mins,0.0001), aht=num(els.aht,0.0001),
+        slg=num(els.sl,1)/100, tsecs=num(els.tsecs,0);
+    if([calls,mins,aht,slg,tsecs].some(function(x){return isNaN(x);})){ return; }
+    var u=calls*aht/(mins*60);
+    uOut.textContent=u.toFixed(1);
+    var m=required(u,aht,slg,tsecs);
+    agentsOut.textContent=m;
+    echo.textContent="to answer "+Math.round(slg*100)+"% of calls within "+tsecs+"s";
+
+    var achSL=sl(m,u,aht,tsecs), achASA=asa(m,u,aht), occ=u/m;
+    chips.innerHTML="";
+    chip("service level", (achSL*100).toFixed(1)+"%", achSL>=slg);
+    chip("ASA", fmtSec(achASA), achASA<=tsecs);
+    chip("occupancy", (occ*100).toFixed(1)+"%", occ<0.9);
+    chip("P(wait)", (erlangC(m,u)*100).toFixed(1)+"%", false);
+
+    rows.innerHTML="";
+    var start=Math.max(Math.floor(u)+1, m-2);
+    for(var mm=start; mm<=m+3; mm++){
+      var r=document.createElement("tr");
+      if(mm===m) r.className="hit";
+      var s=sl(mm,u,aht,tsecs), a=asa(mm,u,aht), o=u/mm;
+      r.innerHTML="<td>"+mm+"</td>"+
+        "<td class='"+(s>=slg?"met":"miss")+"'>"+(s*100).toFixed(1)+"%</td>"+
+        "<td class='"+(a<=tsecs?"met":"miss")+"'>"+fmtSec(a)+"</td>"+
+        "<td>"+(o*100).toFixed(1)+"%</td>"+
+        "<td>"+(erlangC(mm,u)*100).toFixed(1)+"%</td>";
+      rows.appendChild(r);
+    }
+  }
+  function chip(k,v,ok){
+    var d=document.createElement("span");
+    d.className="chip"+(ok?" ok":"");
+    d.innerHTML="<span class='k'>"+k+"</span><b>"+v+"</b>";
+    chips.appendChild(d);
+  }
+  Object.keys(els).forEach(function(k){ els[k].addEventListener("input",compute); });
+  compute();
+
+  /* ---- language switcher ---- */
+  var blocks=[].slice.call(document.querySelectorAll('#samples script[type="text/plain"]'));
+  var langs=document.getElementById("langs"), fname=document.getElementById("fname"),
+      runs=document.getElementById("runs"), codeout=document.getElementById("codeout"),
+      copyBtn=document.getElementById("copy"), currentCode="";
+
+  function decode(s){ return s.replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&"); }
+
+  function select(i){
+    blocks.forEach(function(b,j){
+      var btn=langs.children[j];
+      btn.setAttribute("aria-selected", j===i?"true":"false");
+    });
+    var b=blocks[i];
+    currentCode=decode(b.textContent).replace(/^\n/,"").replace(/\s+$/,"")+"\n";
+    codeout.textContent=currentCode;
+    fname.textContent=b.getAttribute("data-file");
+    runs.hidden = b.getAttribute("data-runs")!=="1";
+    copyBtn.textContent="copy"; copyBtn.classList.remove("done");
+  }
+  blocks.forEach(function(b,i){
+    var btn=document.createElement("button");
+    btn.className="lang"; btn.type="button"; btn.setAttribute("role","tab");
+    btn.textContent=b.getAttribute("data-lang");
+    btn.addEventListener("click",function(){ select(i); });
+    langs.appendChild(btn);
+  });
+  select(0);
+
+  copyBtn.addEventListener("click",function(){
+    var done=function(){ copyBtn.textContent="copied ✓"; copyBtn.classList.add("done"); setTimeout(function(){ copyBtn.textContent="copy"; copyBtn.classList.remove("done"); },1600); };
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(currentCode).then(done,fallback);
+    } else fallback();
+    function fallback(){
+      var ta=document.createElement("textarea"); ta.value=currentCode;
+      ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta);
+      ta.select(); try{ document.execCommand("copy"); done(); }catch(e){} document.body.removeChild(ta);
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
